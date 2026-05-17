@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.main import create_app
 from app.models import build_fruit_response
+from app.store import InMemoryFruitStore
 
 
 SEED = [
@@ -16,16 +17,20 @@ SEED = [
 ]
 
 
+# Unit tests pin the in-memory backend so they never depend on a real DB,
+# even if DB_* env vars are set in the dev shell.
+
+
 @pytest.fixture
 def seeded_client() -> TestClient:
-    app = create_app()
-    app.state.store.seed(SEED)
-    return TestClient(app)
+    store = InMemoryFruitStore()
+    store.seed(SEED)
+    return TestClient(create_app(store=store))
 
 
 @pytest.fixture
 def empty_client() -> TestClient:
-    return TestClient(create_app())
+    return TestClient(create_app(store=InMemoryFruitStore()))
 
 
 def test_build_fruit_response_returns_expected_shape() -> None:
