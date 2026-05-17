@@ -74,15 +74,24 @@ resource "aws_ecs_service" "fruitapi" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = aws_subnet.public[*].id
-    security_groups  = [aws_security_group.ecs_task.id]
+    subnets         = aws_subnet.public[*].id
+    security_groups = [aws_security_group.ecs_task.id]
+    # Public IPs are needed so tasks can pull the image from GHCR (no NAT in this VPC).
+    # Inbound traffic is gated to the ALB SG, not direct internet.
     assign_public_ip = true
   }
 
-  # Don't fight an external autoscaler / manual scale changes.
-  lifecycle {
-    ignore_changes = [desired_count]
+  load_balancer {
+    target_group_arn = aws_lb_target_group.fruitapi.arn
+    container_name   = var.project_name
+    container_port   = var.container_port
   }
 
-  depends_on = [aws_db_instance.main]
+  # Give the container a minute to start before the ALB starts failing health checks.
+  health_check_grace_period_seconds = 60
+
+  depends_on = [
+    aws_db_instance.main,
+    aws_lb_listener.http,
+  ]
 }

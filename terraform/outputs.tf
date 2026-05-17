@@ -28,3 +28,18 @@ output "db_secret_arn" {
   description = "Secrets Manager ARN that stores the MySQL admin password."
   value       = aws_secretsmanager_secret.db_password.arn
 }
+
+output "alb_dns_name" {
+  description = "ALB DNS name — stable public hostname for FruitAPI."
+  value       = aws_lb.main.dns_name
+}
+
+output "alb_url" {
+  description = "Full URL of FruitAPI behind the ALB."
+  value       = "http://${aws_lb.main.dns_name}"
+}
+
+output "github_actions_role_arn" {
+  description = "ARN of the IAM role GitHub Actions assumes via OIDC for ECS deploys. Save this as a repo Variable named AWS_DEPLOY_ROLE_ARN."
+  value       = aws_iam_role.github_actions.arn
+}
