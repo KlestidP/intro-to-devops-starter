@@ -4,11 +4,12 @@ from datetime import datetime, timezone
 from threading import Lock
 from typing import Iterable, Optional
 
-from .models import Fruit
+from ..models import Fruit
+from .base import FruitStore
 
 
-class FruitStore:
-    #In-memory store
+class InMemoryFruitStore(FruitStore):
+    """In-memory store kept for unit tests and local dev without a database."""
 
     def __init__(self) -> None:
         self._items: dict[int, Fruit] = {}

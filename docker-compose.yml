@@ -1,0 +1,38 @@
+# Local dev stack: FruitAPI + MySQL.
+# Real credentials live in AWS Secrets Manager for the ECS deployment;
+# these are dev-only and safe to check in.
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: fruitapi
+      MYSQL_USER: fruitapi
+      MYSQL_PASSWORD: fruitpass
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-prootpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  fruitapi:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: fruitapi
+      DB_PASSWORD: fruitpass
+      DB_NAME: fruitapi
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql-data:

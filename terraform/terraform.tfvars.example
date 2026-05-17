@@ -1,0 +1,7 @@
+github_owner = "klestidp"
+image_tag    = "latest"
+
+# Defaults are fine for everything else; uncomment to override.
+# aws_region    = "eu-central-1"
+# project_name  = "fruitapi"
+# desired_count = 1

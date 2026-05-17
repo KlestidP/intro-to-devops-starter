@@ -24,3 +24,13 @@ Thumbs.db
 .claude/
 sbom*.json
 junit/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+.terraform.tfstate.lock.info

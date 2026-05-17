@@ -37,6 +37,21 @@ jobs:
     name: Build, integration-test, push
     needs: unit-tests
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_DATABASE: fruitapi
+          MYSQL_USER: fruitapi
+          MYSQL_PASSWORD: fruitpass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -prootpass"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     steps:
       - uses: actions/checkout@v4
 
@@ -67,8 +82,16 @@ jobs:
 
       - name: Start container
         run: |
-          docker run -d --name fruitapi -p 8000:8000 fruitapi:ci
-          for _ in $(seq 1 30); do
+          # --network host so FruitAPI can reach the MySQL service on 127.0.0.1.
+          docker run -d --name fruitapi \
+            --network host \
+            -e DB_HOST=127.0.0.1 \
+            -e DB_PORT=3306 \
+            -e DB_USER=fruitapi \
+            -e DB_PASSWORD=fruitpass \
+            -e DB_NAME=fruitapi \
+            fruitapi:ci
+          for _ in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:8000/health > /dev/null; then
               echo "FruitAPI is healthy"
               exit 0

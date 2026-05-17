@@ -7,12 +7,29 @@ A small FastAPI service that manages a catalog of fruits. Used as the project fo
 ## Layout
 
 ```
-app/             FastAPI application (models, in-memory store, routes, app factory)
-tests/           test_main.py (unit) and test_integration.py (against a real server)
-main.py          repo-root entrypoint — `python main.py` to run locally
+app/
+  models.py        Pydantic models + the pure response-builder helper
+  routes.py        HTTP routes (FastAPI)
+  main.py          create_app() factory
+  store/
+    base.py        FruitStore abstract base class
+    memory.py      InMemoryFruitStore  — used by unit tests / local dev w/o a DB
+    mysql.py       MySQLFruitStore     — used in containers when DB_HOST is set
+tests/             test_main.py (unit) and test_integration.py (against a real server)
+main.py            repo-root entrypoint — `python main.py`
+docker-compose.yml MySQL + FruitAPI stack for local dev
 ```
 
-## Run locally
+## Storage backend
+
+The app picks its `FruitStore` from environment variables:
+
+- If **`DB_HOST`** is set → MySQL via SQLAlchemy + PyMySQL. Required vars: `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` (optional `DB_PORT`, default `3306`).
+- Otherwise → in-memory (lost on restart). Useful for unit tests and quick local runs.
+
+The MySQL schema is created automatically on startup (`metadata.create_all`), so the only thing the database needs upfront is the empty `DB_NAME` schema.
+
+## Run locally — in-memory (no DB)
 
 ```powershell
 py -3.12 -m venv .venv
@@ -21,6 +38,19 @@ py -3.12 -m venv .venv
 ```
 
 Then hit http://127.0.0.1:8000/health.
+
+## Run locally — with MySQL (docker compose)
+
+```powershell
+docker compose up -d --build
+# wait a few seconds for MySQL to come up; the fruitapi container waits for it
+curl http://127.0.0.1:8000/health
+
+# poke MySQL directly to see what the API persisted
+docker compose exec mysql mysql -ufruitapi -pfruitpass fruitapi -e 'SELECT * FROM fruits;'
+
+docker compose down -v   # -v wipes the MySQL volume
+```
 
 ## Run tests
 
@@ -35,7 +65,17 @@ Then hit http://127.0.0.1:8000/health.
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-Integration tests honour a `BASE_URL` env var — point it at a running container (Lecture 2+) instead of spawning a local server.
+Integration tests honour a `BASE_URL` env var — point it at a running container (Lecture 2+) instead of spawning a local server. When run against the docker-compose stack this exercises the MySQL backend end-to-end:
+
+```powershell
+docker compose up -d --build
+$env:BASE_URL = "http://127.0.0.1:8000"
+.\.venv\Scripts\python.exe -m pytest tests/test_integration.py
+docker compose down -v
+Remove-Item Env:\BASE_URL
+```
+
+Unit tests always pin the in-memory store, so they pass even if `DB_HOST` is set in your shell.
 
 ## Endpoints
 
