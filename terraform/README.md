@@ -6,8 +6,11 @@ Provisions everything FruitAPI needs to run on AWS Fargate against an RDS MySQL 
 VPC (10.0.0.0/16)
 ├── 2 public subnets (one per AZ, eu-central-1a + 1b)
 ├── Internet gateway + public route table
+├── Application Load Balancer (port 80, public)
+│   └── Target group "fruitapi-tg" health-checks /health on port 8000
 ├── ECS cluster (Fargate)
-│   └── Service "fruitapi-svc" → 1 task with a public IP
+│   └── Service "fruitapi-svc" → N tasks registered with the target group
+│       ├── Inbound only from the ALB SG (no direct internet)
 │       └── Container pulled from ghcr.io/<owner>/fruitapi:<tag>
 │           env: DB_HOST/PORT/USER/NAME from RDS
 │           secret: DB_PASSWORD from Secrets Manager
@@ -37,22 +40,34 @@ terraform apply     # ~10 minutes (RDS is the slow one)
 
 When apply finishes, useful values are printed by `terraform output`.
 
-## Finding the running task's public IP
-
-We deliberately don't put an ALB in front yet (that's Lecture 5). The task gets a public IP that changes on every restart.
+## Hitting the API
 
 ```powershell
-$cluster = terraform output -raw ecs_cluster_name
-$service = terraform output -raw ecs_service_name
+$url = terraform output -raw alb_url
+curl "$url/health"
+curl "$url/fruits"
+```
 
-$task = aws ecs list-tasks --cluster $cluster --service-name $service --query 'taskArns[0]' --output text
-$eni  = aws ecs describe-tasks --cluster $cluster --tasks $task `
-        --query "tasks[0].attachments[0].details[?name=='networkInterfaceId'].value" --output text
-$ip   = aws ec2 describe-network-interfaces --network-interface-ids $eni `
-        --query 'NetworkInterfaces[0].Association.PublicIp' --output text
+The ALB DNS name is stable across deploys and task restarts — unlike the per-task public IP from Lecture 4. Direct task-IP access is now blocked by the security-group changes (ECS task SG only accepts traffic from the ALB SG).
 
-curl "http://${ip}:8000/health"
-curl "http://${ip}:8000/fruits"
+## CI/CD setup (Lecture 6)
+
+The deploy job in [`main.yml`](../.github/workflows/main.yml) assumes an IAM role via GitHub OIDC and triggers a rolling redeploy after each successful image push.
+
+One-time setup:
+
+1. **Apply terraform** so the role exists. After apply, copy the role ARN:
+   ```powershell
+   terraform output -raw github_actions_role_arn
+   ```
+2. **Add a repo Variable in GitHub** — Repo → Settings → Secrets and variables → Actions → **Variables** tab → "New repository variable":
+   - Name: `AWS_DEPLOY_ROLE_ARN`
+   - Value: paste the ARN from step 1
+3. **That's it** — the next push to `main` (or merge to `main`) builds and pushes the image, then the `deploy` job force-deploys ECS to roll the new image. The job is gated by `if: vars.AWS_DEPLOY_ROLE_ARN != ''`, so it sits out cleanly until you've done step 2.
+
+Watch the deploy in CloudWatch:
+```powershell
+aws logs tail (terraform output -raw log_group) --follow
 ```
 
 ## Tailing logs
@@ -89,9 +104,10 @@ Removes the VPC, RDS, ECS, secret, log group — everything. RDS takes ~5 minute
 |---|---|---|
 | VPC / subnets / route tables / IGW / SGs | Always free | $0 |
 | RDS `db.t3.micro` MySQL, 20 GB | 750 hrs/mo, first 12 months | ~$15/mo |
-| ECS Fargate task (0.25 vCPU, 512 MB) | Not in FT | ~$8.50/mo if always running |
+| ECS Fargate (0.25 vCPU, 512 MB) × `desired_count` | Not in FT | ~$8.50/mo per task always-on |
+| Application Load Balancer | Not in FT | ~$18/mo always-on + tiny LCU charge |
 | CloudWatch Logs | 5 GB ingest free | ~$0 here |
 | Secrets Manager | Not in FT | $0.40/mo per secret + tiny API cost |
 | Data egress | 100 GB/mo free | ~$0 here |
 
-`terraform destroy` when not actively working keeps the running cost at $0.
+`terraform destroy` when not actively working keeps the running cost at $0. The ALB is the most expensive idle resource — definitely don't leave it running between sessions.

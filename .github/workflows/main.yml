@@ -161,3 +161,51 @@ jobs:
             echo "- Also tagged: \`${{ steps.meta.outputs.latest_tag }}\`"
             echo "- SBOM: \`sbom-${{ steps.meta.outputs.sha_short }}\` artifact"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy to ECS
+    needs: build-test-push
+    runs-on: ubuntu-latest
+    # Skip cleanly if the repo Variable isn't set (e.g. first run before
+    # terraform's OIDC role is in place). After you set AWS_DEPLOY_ROLE_ARN
+    # this job becomes the CD half of CI/CD.
+    if: vars.AWS_DEPLOY_ROLE_ARN != ''
+    permissions:
+      id-token: write   # OIDC token request
+      contents: read
+    env:
+      AWS_REGION: eu-central-1
+      ECS_CLUSTER: fruitapi-cluster
+      ECS_SERVICE: fruitapi-svc
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Force new ECS deployment
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --force-new-deployment \
+            --output text > /dev/null
+          echo "Triggered rolling deploy of $ECS_SERVICE"
+
+      - name: Wait for service to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE"
+          echo "Service is stable"
+
+      - name: Summarize deploy
+        run: |
+          {
+            echo "## Deploy"
+            echo ""
+            echo "- Cluster: \`$ECS_CLUSTER\`"
+            echo "- Service: \`$ECS_SERVICE\`"
+            echo "- Triggered rolling deploy and waited for stability."
+          } >> "$GITHUB_STEP_SUMMARY"

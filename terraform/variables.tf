@@ -15,6 +15,12 @@ variable "github_owner" {
   type        = string
 }
 
+variable "github_repo_name" {
+  description = "Name of the GitHub repo (used to scope which repo can assume the OIDC deploy role)."
+  type        = string
+  default     = "intro-to-devops-starter"
+}
+
 variable "image_tag" {
   description = "Tag of the FruitAPI image to deploy. The main pipeline tags each push with the short SHA and 'latest'."
   type        = string
@@ -76,9 +82,9 @@ variable "task_memory" {
 }
 
 variable "desired_count" {
-  description = "Number of ECS tasks to run. Bumped to 2+ in Lecture 5."
+  description = "Number of ECS tasks to run behind the ALB."
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "log_retention_days" {
