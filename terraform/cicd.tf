@@ -1,5 +1,4 @@
-# OIDC trust between AWS and GitHub Actions so the deploy job can assume
-# an IAM role for the duration of the workflow — no long-lived access keys.
+# OIDC trust so GitHub Actions can assume an IAM role without static credentials.
 
 data "tls_certificate" "github_oidc" {
   url = "https://token.actions.githubusercontent.com"

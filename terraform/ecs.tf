@@ -76,8 +76,7 @@ resource "aws_ecs_service" "fruitapi" {
   network_configuration {
     subnets         = aws_subnet.public[*].id
     security_groups = [aws_security_group.ecs_task.id]
-    # Public IPs are needed so tasks can pull the image from GHCR (no NAT in this VPC).
-    # Inbound traffic is gated to the ALB SG, not direct internet.
+    # Needed for outbound image pull; inbound is still gated by the SG.
     assign_public_ip = true
   }
 
