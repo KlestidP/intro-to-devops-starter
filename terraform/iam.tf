@@ -8,8 +8,7 @@ data "aws_iam_policy_document" "ecs_task_assume" {
   }
 }
 
-# Execution role: ECS uses this BEFORE the container runs (pull image, write logs,
-# fetch secrets and inject them as env vars).
+# Execution role: ECS uses this to pull the image, write logs, and fetch secrets.
 resource "aws_iam_role" "ecs_task_execution" {
   name               = "${var.project_name}-task-execution"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_assume.json
@@ -33,8 +32,7 @@ resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
   policy = data.aws_iam_policy_document.secrets_read.json
 }
 
-# Task role: identity the running container itself has. Empty for now — the
-# app doesn't call AWS APIs. Kept here so adding e.g. S3 access later is a 1-line change.
+# Task role: container's own AWS identity (empty for now; app doesn't call AWS).
 resource "aws_iam_role" "ecs_task" {
   name               = "${var.project_name}-task"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_assume.json

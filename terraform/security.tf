@@ -22,8 +22,7 @@ resource "aws_security_group" "alb" {
 
 resource "aws_security_group" "ecs_task" {
   name = "${var.project_name}-ecs-task"
-  # Description kept verbatim from the L4 state to avoid forcing a replacement;
-  # the real change in L5 is the ingress source, which updates in-place.
+  # Description text frozen — SG description is immutable, changing it forces replacement.
   description = "ECS task: inbound on container port, outbound anywhere."
   vpc_id      = aws_vpc.main.id
 

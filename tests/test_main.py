@@ -17,8 +17,7 @@ SEED = [
 ]
 
 
-# Unit tests pin the in-memory backend so they never depend on a real DB,
-# even if DB_* env vars are set in the dev shell.
+# Unit tests pin the in-memory store so they never hit a real DB.
 
 
 @pytest.fixture

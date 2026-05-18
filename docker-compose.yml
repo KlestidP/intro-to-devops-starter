@@ -1,6 +1,4 @@
-# Local dev stack: FruitAPI + MySQL.
-# Real credentials live in AWS Secrets Manager for the ECS deployment;
-# these are dev-only and safe to check in.
+# Local dev stack only — production creds live in AWS Secrets Manager.
 
 services:
   mysql:

@@ -20,8 +20,7 @@ resource "aws_internet_gateway" "main" {
   }
 }
 
-# Public subnets only — no NAT gateway (it costs $32/mo and isn't free-tier).
-# ECS tasks get public IPs to pull images and reach AWS APIs directly.
+# Public subnets only — no NAT gateway (not free-tier).
 resource "aws_subnet" "public" {
   count                   = length(var.public_subnet_cidrs)
   vpc_id                  = aws_vpc.main.id
